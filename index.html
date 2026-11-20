@@ -42,12 +42,11 @@
   </div>
 
   <script>
-    // ⚠️ បិទភ្ជាប់ Link Web App (/exec) របស់អ្នកនៅក្នុងសញ្ញា "" ខាងក្រោមនេះ៖
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxVHBJH6SEbTU0TRcUG5fge3p5xsl2EyglG-t8lcqAlhmOxiC8Y5p2XaK-l4oAH0xFr/exec";
+    // ⚠️ កុំភ្លេចជំនួស Link Apps Script (/exec) របស់អ្នកនៅទីនេះ៖
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxVHBJH6SEbTU0TRcUG5fge3p5xsl2EyglG-t8lcqAlhmOxiC8Y5p2XaK-l4oAH0xFr/execេះ";
 
     let isProcessing = false;
 
-    // ទាញយកបញ្ជីឈ្មោះសិស្សពី Google Sheet
     fetch(SCRIPT_URL)
       .then(res => res.json())
       .then(students => {
@@ -61,7 +60,6 @@
         });
       });
 
-    // បើកកាមេរ៉ាស្កែនស៊ុម ៤ ជ្រុង (Live Scanner)
     const html5QrCode = new Html5Qrcode("reader");
     html5QrCode.start(
       { facingMode: "environment" },
