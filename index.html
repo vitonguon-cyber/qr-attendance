@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ប្រព័ន្ធស្កែនវត្តមានសិស្ស</title>
-  <script src="https://unpkg.com" type="text/javascript"></script>
+  <script src="https://cloudflare.com"></script>
   <style>
     body { font-family: 'Khmer OS Battambang', Arial, sans-serif; padding: 15px; background: #f4f6f9; text-align: center; }
     .container { max-width: 480px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -27,7 +27,6 @@
   <div class="container">
     <h2>📷 ស្កែនវត្តមានសិស្ស</h2>
     
-    <!-- ប៊ូតុងចុចបើកកាមេរ៉ាស្កែនស៊ុម ៤ ជ្រុង -->
     <button id="btnOpenCam" class="btn-open-cam" onclick="startScanner()">📸 ចុចបើកកាមេរ៉ាស្កែន QR</button>
     <div id="reader"></div>
     <div id="status"></div>
@@ -66,23 +65,37 @@
         });
       });
 
-    // មុខងារបើកកាមេរ៉ាស៊ុម ៤ ជ្រុងពេលចុចប៊ូតុង
+    // មុខងារបើកកាមេរ៉ាស៊ុម ៤ ជ្រុង
     function startScanner() {
-      document.getElementById('btnOpenCam').style.display = 'none';
-      html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 230, height: 230 } },
-        (decodedText) => {
-          if (isProcessing) return;
-          isProcessing = true;
-          sendData(decodedText, 'PRESENT');
-        },
-        (err) => {}
-      ).catch(err => {
+      try {
+        if (typeof Html5Qrcode === "undefined") {
+          showStatus("❌ ប្រព័ន្ធស្កែនមិនទាន់ទាញយករួច! សូមពិនិត្យអ៊ីនធឺណិត រួច Refresh ទំព័រម្តងទៀត។", "error");
+          return;
+        }
+
+        document.getElementById('btnOpenCam').style.display = 'none';
+        showStatus("⏳ កំពុងបើកកាមេរ៉ា...", "success");
+
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 220, height: 220 } },
+          (decodedText) => {
+            if (isProcessing) return;
+            isProcessing = true;
+            sendData(decodedText, 'PRESENT');
+          },
+          (err) => {}
+        ).then(() => {
+          document.getElementById('status').style.display = 'none';
+        }).catch(err => {
+          document.getElementById('btnOpenCam').style.display = 'block';
+          showStatus("❌ មិនអាចបើកកាមេរ៉ាបានទេ៖ " + err, "error");
+        });
+      } catch (e) {
         document.getElementById('btnOpenCam').style.display = 'block';
-        showStatus("❌ មិនអាចបើកកាមេរ៉ាបានទេ៖ សូមបើក Link ក្នុង Google Chrome ហើយចុច Allow Camera!", "error");
-      });
+        showStatus("❌ កំហុសបច្ចេកទេស៖ " + e.message, "error");
+      }
     }
 
     function sendData(studentId, statusType) {
