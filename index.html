@@ -4,12 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ប្រព័ន្ធស្កែនវត្តមានសិស្ស</title>
-  <script src="https://cloudflare.com"></script>
+  <script src="https://jsdelivr.net"></script>
   <style>
     body { font-family: 'Khmer OS Battambang', Arial, sans-serif; padding: 15px; background: #f4f6f9; text-align: center; }
     .container { max-width: 480px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
     h2 { color: #1a73e8; margin-top: 0; }
-    #reader { width: 100%; border-radius: 10px; overflow: hidden; margin-bottom: 15px; }
+    
+    /* ប្រអប់កាមេរ៉ា និងស៊ុមស្កែន ៤ ជ្រុង */
+    .camera-wrapper { position: relative; width: 100%; max-width: 320px; margin: 0 auto 15px auto; border-radius: 12px; overflow: hidden; background: #000; display: none; }
+    video { width: 100%; display: block; }
+    .scan-frame {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 200px; height: 200px; border: 3px solid #00ff00; border-radius: 12px;
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45); pointer-events: none;
+    }
+
     .btn-open-cam { background: #28a745; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 17px; font-weight: bold; width: 100%; cursor: pointer; margin-bottom: 10px; }
     #status { padding: 12px; border-radius: 8px; font-weight: bold; margin: 15px 0; display: none; }
     .success { background: #d4edda; color: #155724; display: block !important; }
@@ -27,8 +36,14 @@
   <div class="container">
     <h2>📷 ស្កែនវត្តមានសិស្ស</h2>
     
-    <button id="btnOpenCam" class="btn-open-cam" onclick="startScanner()">📸 ចុចបើកកាមេរ៉ាស្កែន QR</button>
-    <div id="reader"></div>
+    <button id="btnOpenCam" class="btn-open-cam" onclick="startNativeCamera()">📸 ចុចបើកកាមេរ៉ាស្កែន QR</button>
+    
+    <div class="camera-wrapper" id="camWrapper">
+      <video id="video" playsinline autoplay muted></video>
+      <div class="scan-frame"></div>
+      <canvas id="canvas" hidden></canvas>
+    </div>
+
     <div id="status"></div>
 
     <div class="manual-box">
@@ -49,7 +64,9 @@
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxVHBJH6SEbTU0TRcUG5fge3p5xsl2EyglG-t8lcqAlhmOxiC8Y5p2XaK-l4oAH0xFr/exec";
 
     let isProcessing = false;
-    let html5QrCode = null;
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
 
     // ទាញយកបញ្ជីឈ្មោះសិស្ស
     fetch(SCRIPT_URL)
@@ -65,37 +82,58 @@
         });
       });
 
-    // មុខងារបើកកាមេរ៉ាស៊ុម ៤ ជ្រុង
-    function startScanner() {
+    // បើកកាមេរ៉ាផ្ទាល់របស់ទូរស័ព្ទ (មិនពឹងផ្អែកលើ Library ខាងក្រៅ)
+    async function startNativeCamera() {
       try {
-        if (typeof Html5Qrcode === "undefined") {
-          showStatus("❌ ប្រព័ន្ធស្កែនមិនទាន់ទាញយករួច! សូមពិនិត្យអ៊ីនធឺណិត រួច Refresh ទំព័រម្តងទៀត។", "error");
-          return;
-        }
-
-        document.getElementById('btnOpenCam').style.display = 'none';
-        showStatus("⏳ កំពុងបើកកាមេរ៉ា...", "success");
-
-        html5QrCode = new Html5Qrcode("reader");
-        html5QrCode.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 220, height: 220 } },
-          (decodedText) => {
-            if (isProcessing) return;
-            isProcessing = true;
-            sendData(decodedText, 'PRESENT');
-          },
-          (err) => {}
-        ).then(() => {
-          document.getElementById('status').style.display = 'none';
-        }).catch(err => {
-          document.getElementById('btnOpenCam').style.display = 'block';
-          showStatus("❌ មិនអាចបើកកាមេរ៉ាបានទេ៖ " + err, "error");
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
         });
-      } catch (e) {
-        document.getElementById('btnOpenCam').style.display = 'block';
-        showStatus("❌ កំហុសបច្ចេកទេស៖ " + e.message, "error");
+        video.srcObject = stream;
+        document.getElementById('btnOpenCam').style.display = 'none';
+        document.getElementById('camWrapper').style.display = 'block';
+        document.getElementById('status').style.display = 'none';
+        
+        video.onloadedmetadata = () => {
+          video.play();
+          scanLoop();
+        };
+      } catch (err) {
+        showStatus("❌ មិនអាចបើកកាមេរ៉ាបានទេ៖ សូមចុច Allow នៅលើ Chrome ដើម្បីអនុញ្ញាតឱ្យប្រើកាមេរ៉ា!", "error");
       }
+    }
+
+    // ស្កែន QR Code ជាបន្តបន្ទាប់
+    async function scanLoop() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA && !isProcessing) {
+        // វិធីទី ១៖ ប្រើ BarcodeDetector ដើមរបស់ទូរស័ព្ទ Android (លឿនបំផុត មិនបាច់ប្រើអ៊ីនធឺណិតទាញ Library)
+        if ('BarcodeDetector' in window) {
+          try {
+            const detector = new BarcodeDetector({ formats: ['qr_code'] });
+            const barcodes = await detector.detect(video);
+            if (barcodes.length > 0) {
+              handleDetected(barcodes.item(0).rawValue);
+            }
+          } catch (e) {}
+        } 
+        // វិធីទី ២៖ ប្រើ jsQR ជាជំនួយបន្ថែម (សម្រាប់ iPhone ឬ Browser ផ្សេង)
+        else if (typeof jsQR !== 'undefined') {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          if (code) {
+            handleDetected(code.data);
+          }
+        }
+      }
+      requestAnimationFrame(scanLoop);
+    }
+
+    function handleDetected(qrText) {
+      if (isProcessing) return;
+      isProcessing = true;
+      sendData(qrText, 'PRESENT');
     }
 
     function sendData(studentId, statusType) {
