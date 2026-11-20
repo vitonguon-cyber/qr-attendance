@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ប្រព័ន្ធស្កែនវត្តមានសិស្ស</title>
+  <script src="https://unpkg.com" type="text/javascript"></script>
+  <style>
+    body { font-family: 'Khmer OS Battambang', Arial, sans-serif; padding: 15px; background: #f4f6f9; text-align: center; }
+    .container { max-width: 480px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    h2 { color: #1a73e8; margin-top: 0; }
+    #reader { width: 100%; border-radius: 10px; overflow: hidden; margin-bottom: 15px; border: 2px solid #1a73e8; }
+    #status { padding: 12px; border-radius: 8px; font-weight: bold; margin: 15px 0; display: none; }
+    .success { background: #d4edda; color: #155724; display: block !important; }
+    .error { background: #f8d7da; color: #721c24; display: block !important; }
+    .manual-box { border-top: 1px solid #ddd; padding-top: 15px; margin-top: 15px; text-align: left; }
+    select, button { width: 100%; padding: 12px; margin-top: 8px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
+    .btn-group { display: flex; gap: 8px; margin-top: 10px; }
+    button { border: none; color: white; font-weight: bold; cursor: pointer; }
+    .btn-scan { background: #1a73e8; }
+    .btn-perm { background: #f39c12; }
+    .btn-abs { background: #e74c3c; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>📷 ស្កែនវត្តមានសិស្ស</h2>
+    <div id="reader"></div>
+    <div id="status"></div>
+
+    <div class="manual-box">
+      <label><b>👤 ហៅឈ្មោះ / កត់ត្រាដោយផ្ទាល់៖</b></label>
+      <select id="studentSelect">
+        <option value="">-- កំពុងទាញយកបញ្ជីឈ្មោះ... --</option>
+      </select>
+      <div class="btn-group">
+        <button class="btn-scan" onclick="manualSubmit('PRESENT')">ចូល / ចេញ</button>
+        <button class="btn-perm" onclick="manualSubmit('PERMISSION')">មានច្បាប់</button>
+        <button class="btn-abs" onclick="manualSubmit('ABSENT')">ឥតច្បាប់</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ⚠️ បិទភ្ជាប់ Link Web App (/exec) របស់អ្នកនៅក្នុងសញ្ញា "" ខាងក្រោមនេះ៖
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxVHBJH6SEbTU0TRcUG5fge3p5xsl2EyglG-t8lcqAlhmOxiC8Y5p2XaK-l4oAH0xFr/exec";
+
+    let isProcessing = false;
+
+    // ទាញយកបញ្ជីឈ្មោះសិស្សពី Google Sheet
+    fetch(SCRIPT_URL)
+      .then(res => res.json())
+      .then(students => {
+        const select = document.getElementById('studentSelect');
+        select.innerHTML = '<option value="">-- ជ្រើសរើសឈ្មោះសិស្ស --</option>';
+        students.forEach(s => {
+          let opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.id + " - " + s.name + " (" + s.gender + ")";
+          select.appendChild(opt);
+        });
+      });
+
+    // បើកកាមេរ៉ាស្កែនស៊ុម ៤ ជ្រុង (Live Scanner)
+    const html5QrCode = new Html5Qrcode("reader");
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 230, height: 230 } },
+      (decodedText) => {
+        if (isProcessing) return;
+        isProcessing = true;
+        sendData(decodedText, 'PRESENT');
+      },
+      (err) => {}
+    ).catch(err => {
+      showStatus("❌ សូមអនុញ្ញាតឱ្យប្រើកាមេរ៉ា (Allow Camera) នៅលើ Browser!", "error");
+    });
+
+    function sendData(studentId, statusType) {
+      showStatus("⏳ កំពុងកត់ត្រាអត្តលេខ៖ " + studentId + "...", "success");
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({ studentId: studentId, statusType: statusType })
+      })
+      .then(res => res.json())
+      .then(res => {
+        showStatus(res.message, res.success ? "success" : "error");
+        setTimeout(() => { isProcessing = false; }, 2500);
+      })
+      .catch(err => {
+        showStatus("❌ មានបញ្ហាការតភ្ជាប់អ៊ីនធឺណិត!", "error");
+        isProcessing = false;
+      });
+    }
+
+    function manualSubmit(type) {
+      const studentId = document.getElementById('studentSelect').value;
+      if (!studentId) { alert("សូមជ្រើសរើសឈ្មោះសិស្សជាមុនសិន!"); return; }
+      sendData(studentId, type);
+    }
+
+    function showStatus(msg, type) {
+      const statusDiv = document.getElementById('status');
+      statusDiv.textContent = msg;
+      statusDiv.className = type;
+    }
+  </script>
+</body>
+</html>
